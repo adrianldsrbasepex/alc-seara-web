@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  logitrack:
+    container_name: logitrack-app
+    build:
+      context: .
+      args:
+        # Estas variáveis devem ser definidas na seção "Environment variables" do Portainer
+        # Ou substituídas manualmente aqui se preferir não usar variáveis
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    restart: unless-stopped
+    # ports:
+    # Não é necessário expor porta para o host se usar a rede alc_public
+    # O NPM acessa direto pela rede interna
+    # - "3000:80"
+    networks:
+      - alc_public
+
+networks:
+  alc_public:
+    external: true
