@@ -2,19 +2,29 @@ version: '3.8'
 
 services:
   logitrack:
-    container_name: logitrack-app
-    build:
-      context: .
-      args:
-        # Estas variáveis devem ser definidas na seção "Environment variables" do Portainer
-        # Ou substituídas manualmente aqui se preferir não usar variáveis
-        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
-    restart: unless-stopped
-    # ports:
-    # Não é necessário expor porta para o host se usar a rede alc_public
-    # O NPM acessa direto pela rede interna
-    # - "3000:80"
+    image: logitrack:latest
+    # Swarm não suporta 'build' direto na stack sem registry. Vamos usar a imagem construída manualmente.
+    # build:
+    #   context: .
+    #   args: ...
+
+    # Swarm usa 'deploy' para reiniciar
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          # Garante que rode no manager (necessário se usar imagem local sem registry)
+          - node.role == manager
+
+    # container_name: logitrack-app # Não suportado no Swarm
+
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    ports:
+      - "3000:80"
     networks:
       - alc_public
 
