@@ -1,0 +1,26 @@
+-- Create admins table if it doesn't exist
+CREATE TABLE IF NOT EXISTS admins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
+
+-- Create policies (Idempotent)
+DROP POLICY IF EXISTS "Enable read access for all users" ON admins;
+CREATE POLICY "Enable read access for all users" ON admins FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Enable insert access for all users" ON admins;
+CREATE POLICY "Enable insert access for all users" ON admins FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Enable update access for all users" ON admins;
+CREATE POLICY "Enable update access for all users" ON admins FOR UPDATE USING (true);
+
+-- Insert requested admin user
+INSERT INTO admins (email, password)
+VALUES ('alc.frotas@gmail.com', 'Admin35986868@#***')
+ON CONFLICT (email) DO UPDATE 
+SET password = EXCLUDED.password;

@@ -1,29 +1,42 @@
-// Developer: Adrian Luciano De Sena Ribeiro - MG | Tel: 31 995347802
 import { supabase } from '../lib/supabase';
 import { Rota } from '../types';
 
-export const servicoRota = {
+export const servicoRotas = {
     async obterRotas() {
         const { data, error } = await supabase
             .from('routes')
-            .select(`
-        *,
-        driver:drivers(*)
-      `)
-            .order('date', { ascending: false });
+            .select('*')
+            .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) throw new Error(error.message);
         return data as Rota[];
     },
 
     async criarRota(rota: Omit<Rota, 'id'>) {
+        // Enforce dual save
         const { data, error } = await supabase
             .from('routes')
-            .insert([rota])
+            .insert(rota)
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) throw new Error(error.message);
+
+
+        return data as Rota;
+    },
+
+    async atualizarRota(id: string, updates: Partial<Rota>) {
+        const { data, error } = await supabase
+            .from('routes')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw new Error(error.message);
+
+
         return data as Rota;
     },
 
@@ -35,20 +48,42 @@ export const servicoRota = {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) throw new Error(error.message);
+
+
         return data as Rota;
     },
 
-    async atualizarRota(id: string, dados: Partial<Rota>) {
-        const { data, error } = await supabase
-            .from('routes')
-            .update(dados)
-            .eq('id', id)
-            .select()
-            .single();
+    async uploadFoto(file: File, path: string) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${path}/${fileName}`;
 
-        if (error) throw error;
-        return data as Rota;
+        const { error: uploadError } = await supabase.storage
+            .from('receipts') // Assuming 'receipts' bucket exists, or change to appropriate bucket
+            .upload(filePath, file);
+
+        if (uploadError) {
+            console.error('Upload error:', uploadError);
+            throw new Error('Falha no upload da imagem');
+        }
+
+        const { data } = supabase.storage
+            .from('receipts')
+            .getPublicUrl(filePath);
+
+        return data.publicUrl;
+    },
+
+    async marcarRotasComoEnviadas(ids: string[]) {
+        if (ids.length === 0) return;
+
+        const { error } = await supabase
+            .from('routes')
+            .update({ reimbursement_sent: true })
+            .in('id', ids);
+
+        if (error) throw new Error(error.message);
+
     }
 };
-

@@ -1,2 +1,3 @@
-// Este arquivo anteriormente continha dados mock
-// Agora todos os dados vêm do Supabase através dos serviços
+// API_URL has been decommissioned. The app now uses Supabase directly for all data operations.
+// No local backend server is required.
+export const API_URL = '';

@@ -1,36 +1,32 @@
+// Developer: Adrian Luciano De Sena Ribeiro - MG | Tel: 31 995347802
 import { supabase } from './supabase';
 
 /**
- * Upload a receipt image to Supabase Storage
+ * Upload a receipt image to the backend server (Supabase Storage)
  * @param file - The image file to upload
- * @param expenseId - Optional expense ID to use in filename
+ * @param expenseId - Optional expense ID (unused in simple upload, kept for compat)
  * @returns The public URL of the uploaded image
  */
 export async function uploadReceipt(file: File, expenseId?: string): Promise<string> {
     try {
-        // Generate unique filename
         const fileExt = file.name.split('.').pop();
-        const fileName = `${expenseId || Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `${fileName}`;
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `receipts/${fileName}`; // Or organize by expenseId if needed
 
-        // Upload file to Supabase Storage
-        const { data, error } = await supabase.storage
-            .from('receipts')
-            .upload(filePath, file, {
-                cacheControl: '3600',
-                upsert: false
-            });
+        const { error: uploadError } = await supabase.storage
+            .from('receipts') // Ensure this bucket exists in Supabase
+            .upload(filePath, file);
 
-        if (error) {
-            throw error;
+        if (uploadError) {
+            console.error('Upload error:', uploadError);
+            throw new Error('Falha ao fazer upload da nota fiscal (Storage)');
         }
 
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
+        const { data } = supabase.storage
             .from('receipts')
             .getPublicUrl(filePath);
 
-        return publicUrl;
+        return data.publicUrl;
     } catch (error) {
         console.error('Error uploading receipt:', error);
         throw new Error('Falha ao fazer upload da nota fiscal');
@@ -38,24 +34,10 @@ export async function uploadReceipt(file: File, expenseId?: string): Promise<str
 }
 
 /**
- * Delete a receipt image from Supabase Storage
+ * Delete a receipt image (Not implemented in backend yet, just placeholder)
  * @param url - The public URL of the image to delete
  */
 export async function deleteReceipt(url: string): Promise<void> {
-    try {
-        // Extract filename from URL
-        const fileName = url.split('/').pop();
-        if (!fileName) throw new Error('Invalid URL');
-
-        const { error } = await supabase.storage
-            .from('receipts')
-            .remove([fileName]);
-
-        if (error) {
-            throw error;
-        }
-    } catch (error) {
-        console.error('Error deleting receipt:', error);
-        throw new Error('Falha ao deletar nota fiscal');
-    }
+    console.warn('Delete receipt not implemented in backend yet');
+    return Promise.resolve();
 }

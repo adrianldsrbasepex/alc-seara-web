@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { supabase } from '../lib/supabase';
+// import { supabase } from '../lib/supabase';
 import { Rota, Motorista } from '../types';
 
 export interface SpreadsheetRow {
@@ -94,8 +94,14 @@ export const spreadsheetService = {
                     const headers = jsonData[headerRowIndex].map(h => String(h).toUpperCase().trim());
                     console.log('Found Headers:', headers);
 
-                    // Helper to get index by header name
-                    const getIdx = (name: string) => headers.indexOf(name);
+                    // Helper to get index by header name with fuzzy matching
+                    const getIdx = (name: string, fallback?: string) => {
+                        let idx = headers.indexOf(name);
+                        if (idx === -1) {
+                            idx = headers.findIndex(h => h.includes(name) || (fallback && h.includes(fallback)));
+                        }
+                        return idx;
+                    };
 
                     const colIdx = {
                         PLACA: getIdx('PLACA'),
@@ -103,7 +109,7 @@ export const spreadsheetService = {
                         VIAGEM: getIdx('VIAGEM'),
                         DATA: getIdx('DATA'),
                         KM_INICIO: getIdx('KM INICIO'),
-                        KM_FINAL: getIdx('KM FINAL'),
+                        KM_FINAL: getIdx('KM FINA', 'KM FINAL'), // Suporta "KM FINA" ou "KM FINAL"
                         TOTAL: getIdx('TOTAL'),
                         CIDADE: getIdx('CIDADE'),
                         PERNOITE: getIdx('PERNOITE'),
@@ -119,9 +125,12 @@ export const spreadsheetService = {
                         let formattedDate = new Date().toISOString().split('T')[0];
 
                         if (typeof dateStr === 'number') {
-                            // Excel serial date
+                            // Excel serial date - use UTC methods to avoid timezone shift (e.g. Brazil UTC-3)
                             const date = new Date(Math.round((dateStr - 25569) * 86400 * 1000));
-                            formattedDate = date.toISOString().split('T')[0];
+                            const year = date.getUTCFullYear();
+                            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                            const day = String(date.getUTCDate()).padStart(2, '0');
+                            formattedDate = `${year}-${month}-${day}`;
                         } else if (typeof dateStr === 'string' && dateStr.includes('/')) {
                             const parts = dateStr.trim().split('/');
                             if (parts.length >= 2) {
@@ -150,7 +159,7 @@ export const spreadsheetService = {
                         return {
                             plate: String(getVal(colIdx.PLACA)).trim().toUpperCase(),
                             driver_name: String(getVal(colIdx.MOTORISTA)).trim().toUpperCase(),
-                            route_number: String(getVal(colIdx.VIAGEM)).trim(),
+                            route_number: String(getVal(colIdx.VIAGEM)).replace(/^[\s\uFEFF\xA0\t]+|[\s\uFEFF\xA0\t]+$/g, ''),
                             date: formattedDate,
                             initial_km: parseFloat(getVal(colIdx.KM_INICIO)) || 0,
                             final_km: parseFloat(getVal(colIdx.KM_FINAL)) || 0,
@@ -196,7 +205,7 @@ function processSpreadsheetData(data: any[]): ClosureData[] {
         // Check if row has valid data for Route Identifier (Column D)
         if (!row['D']) continue;
 
-        const routeIdentifier = String(row['D']).trim();
+        const routeIdentifier = String(row['D']).replace(/^[\s\uFEFF\xA0\t]+|[\s\uFEFF\xA0\t]+$/g, '');
 
         // Extract payment date (Column O)
         let paymentDate = row['O'];

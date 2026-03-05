@@ -25,5 +25,11 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "server",
+    "scripts",
+    "supabase",
+    "node_modules"
+  ]
 }

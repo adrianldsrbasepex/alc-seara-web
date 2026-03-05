@@ -2,18 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { Login } from './components/Login';
 import { DriverPanel } from './components/DriverPanel';
 import { AdminPanel } from './components/AdminPanel';
-import { Motorista, Rota, Despesa, StatusRota, TipoUsuario, SolicitacaoPagamento } from './types';
+import { ShunterPanel } from './components/ShunterPanel';
+import { Motorista, Rota, Despesa, StatusRota, TipoUsuario, SolicitacaoPagamento, Usuario, Veiculo } from './types';
 import { servicoMotorista } from './services/driverService';
-import { servicoRota } from './services/routeService';
+import { servicoRotas } from './services/routeService';
 import { servicoFinanceiro } from './services/financialService';
-import { servicoFrota, Veiculo } from './services/fleetService';
+import { servicoFrota } from './services/fleetService';
+import { servicoManobrista } from './services/shunterService';
 import { Toast, ToastContainer, ToastType } from './components/Toast';
 import { supabase } from './lib/supabase';
 
 const App: React.FC = () => {
   // Estado da Aplicação
-  const [visualizacaoAtual, setVisualizacaoAtual] = useState<'login' | 'driver' | 'admin'>('login');
-  const [usuarioAtual, setUsuarioAtual] = useState<Motorista | null>(null);
+  const [visualizacaoAtual, setVisualizacaoAtual] = useState<'login' | 'driver' | 'admin' | 'shunter'>('login');
+  const [usuarioAtual, setUsuarioAtual] = useState<Usuario | Motorista | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const addToast = (message: string, type: ToastType) => {
@@ -26,6 +28,7 @@ const App: React.FC = () => {
   };
 
   const [motoristas, setMotoristas] = useState<Motorista[]>([]);
+  const [manobristas, setManobristas] = useState<Usuario[]>([]);
   const [rotas, setRotas] = useState<Rota[]>([]);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
@@ -36,14 +39,16 @@ const App: React.FC = () => {
   const buscarDados = async (silent = false) => {
     if (!silent) setCarregando(true);
     try {
-      const [dadosMotoristas, dadosRotas, dadosDespesas, dadosVeiculos, dadosSolicitacoes] = await Promise.all([
+      const [dadosMotoristas, dadosManobristas, dadosRotas, dadosDespesas, dadosVeiculos, dadosSolicitacoes] = await Promise.all([
         servicoMotorista.obterMotoristas(),
-        servicoRota.obterRotas(),
+        servicoManobrista.obterManobristas(),
+        servicoRotas.obterRotas(),
         servicoFinanceiro.obterDespesas(),
         servicoFrota.obterVeiculos(),
         servicoFinanceiro.obterSolicitacoesPagamento()
       ]);
       setMotoristas(dadosMotoristas);
+      setManobristas(dadosManobristas);
       setRotas(dadosRotas || []);
       setDespesas(dadosDespesas || []);
       setVeiculos(dadosVeiculos || []);
@@ -73,7 +78,13 @@ const App: React.FC = () => {
     if (visualizacaoAtual === 'admin') {
       const initVehicles = async () => {
         try {
-          const { count } = await supabase.from('vehicles').select('*', { count: 'exact', head: true });
+          // Using count estimation or fetching all IDs (more robust)
+          const { count, error } = await supabase
+            .from('vehicles')
+            .select('*', { count: 'exact', head: true });
+
+          if (error) throw error;
+
           if ((count || 0) < 12) {
             await servicoFrota.adicionarVeiculosOficiais();
             buscarDados(true);
@@ -87,16 +98,15 @@ const App: React.FC = () => {
   }, [visualizacaoAtual]);
 
   // Manipuladores
-  const manipularLogin = async (tipo: 'MOTORISTA' | 'ADMIN', emailRaw: string, passwordRaw: string) => {
+  const manipularLogin = async (tipo: 'MOTORISTA' | 'ADMIN' | 'MANOBRISTA', emailRaw: string, passwordRaw: string) => {
     const email = emailRaw.trim().toLowerCase();
     const password = passwordRaw.trim();
     setCarregando(true);
     try {
-      // 1. Verificar se é motorista em qualquer modo de tentativa
-      const motoristasDb = await servicoMotorista.obterMotoristas();
-      const motorista = motoristasDb.find(m => m.email.trim().toLowerCase() === email);
-
       if (tipo === 'ADMIN') {
+        const motoristasDb = await servicoMotorista.obterMotoristas();
+        const motorista = motoristasDb.find(m => m.email.trim().toLowerCase() === email);
+
         // Bloqueio explícito: Motorista não pode entrar como ADMIN
         if (motorista) {
           addToast('Acesso negado: Motoristas não possuem permissão administrativa.', 'error');
@@ -104,18 +114,17 @@ const App: React.FC = () => {
           return;
         }
 
-        // Verificação de Admin no Banco
+        // Verificação de Admin no Banco (Supabase)
         const { data: admin, error } = await supabase
           .from('admins')
           .select('*')
           .eq('email', email)
-          .eq('password', password) // Adicionado para autenticação por senha
+          .eq('password', password) // Ideally hashing should be used, but replicating current logic
           .single();
 
         if (error || !admin) {
           addToast('Conta de administrador não encontrada ou não autorizada.', 'error');
         } else {
-          // Setting explicit Admin session
           setUsuarioAtual({
             id: admin.id,
             nome: 'Administrador',
@@ -125,8 +134,32 @@ const App: React.FC = () => {
           setVisualizacaoAtual('admin');
           addToast('Bem-vindo ao Painel Administrativo', 'success');
         }
+      } else if (tipo === 'MANOBRISTA') {
+        // Login Manobrista
+        const { data: shunter, error } = await supabase
+          .from('shunters')
+          .select('*')
+          .eq('email', email)
+          .eq('password', password)
+          .single();
+
+        if (error || !shunter) {
+          addToast('Credenciais de manobrista inválidas. Verifique o e-mail/senha.', 'error');
+        } else {
+          setUsuarioAtual({
+            id: shunter.id,
+            nome: shunter.name,
+            email: shunter.email,
+            tipo: TipoUsuario.MANOBRISTA
+          });
+          setVisualizacaoAtual('shunter');
+          addToast(`Bem-vindo, ${shunter.name}`, 'success');
+        }
       } else {
         // Login Motorista
+        const motoristasDb = await servicoMotorista.obterMotoristas();
+        const motorista = motoristasDb.find(m => m.email.trim().toLowerCase() === email);
+
         if (motorista) {
           setUsuarioAtual({ ...motorista, tipo: TipoUsuario.MOTORISTA });
           setVisualizacaoAtual('driver');
@@ -156,6 +189,10 @@ const App: React.FC = () => {
       setVisualizacaoAtual('login');
       setUsuarioAtual(null);
     }
+    if (visualizacaoAtual === 'shunter' && usuarioAtual?.tipo !== TipoUsuario.MANOBRISTA) {
+      setVisualizacaoAtual('login');
+      setUsuarioAtual(null);
+    }
   }, [visualizacaoAtual, usuarioAtual]);
 
   const manipularLogout = () => {
@@ -169,7 +206,7 @@ const App: React.FC = () => {
       const rotaAtual = rotas.find(r => r.id === rotaId);
       if (!rotaAtual) return;
 
-      const updated = await servicoRota.atualizarRota(rotaId, dadosAtualizacao);
+      const updated = await servicoRotas.atualizarRota(rotaId, dadosAtualizacao);
       setRotas(prev => prev.map(r => r.id === rotaId ? updated : r));
     } catch (e) {
       console.error('Falha ao atualizar rota', e);
@@ -263,7 +300,7 @@ const App: React.FC = () => {
 
   const manipularAdicionarRota = async (dadosRota: Omit<Rota, 'id'>) => {
     try {
-      const novaRota = await servicoRota.criarRota(dadosRota);
+      const novaRota = await servicoRotas.criarRota(dadosRota);
       setRotas(prev => [novaRota, ...prev]);
     } catch (e) {
       console.error('Falha ao criar rota', e);
@@ -301,13 +338,66 @@ const App: React.FC = () => {
   };
 
   const manipularExcluirMotorista = async (id: string) => {
+    console.log('--- DIAGNÓSTICO DE EXCLUSÃO ---');
+    console.log('ID do motorista:', id);
+    console.log('Motoristas em estado:', motoristas.map(m => m.id));
+
     try {
-      await servicoMotorista.excluirMotorista(id);
+      // 1. Check for all potential dependencies
+      const temRotas = rotas.some(r => r.driver_id === id);
+      const temDespesas = despesas.some(e => e.motoristaId === id);
+      const temSolicitacoes = solicitacoes.some(s => s.motoristaId === id);
+
+      console.log('Dependências encontradas:', { temRotas, temDespesas, temSolicitacoes });
+
+      if (temRotas || temDespesas || temSolicitacoes) {
+        let deps = [];
+        if (temRotas) deps.push('rotas');
+        if (temDespesas) deps.push('despesas');
+        if (temSolicitacoes) deps.push('solicitações de pagamento');
+
+        const msg = `Impossível excluir motorista com ${deps.join(', ')} vinculadas.`;
+        console.warn(msg);
+        addToast(msg, 'error');
+        return;
+      }
+
+      // 2. Optimistic Update
       setMotoristas(prev => prev.filter(m => m.id !== id));
+
+      // 3. Deletion with verification (driverService was updated to verify)
+      await servicoMotorista.excluirMotorista(id);
+
       addToast('Motorista excluído com sucesso!', 'success');
+      buscarDados(true);
+    } catch (e: any) {
+      console.error('Falha ao excluir motorista:', e);
+      // Revert local state
+      buscarDados(true);
+
+      const errorMsg = e.message || 'Erro desconhecido ao excluir motorista.';
+      addToast(errorMsg, 'error');
+    }
+  };
+
+  const manipularAdicionarManobrista = async (dados: { name: string, email: string, password?: string }) => {
+    try {
+      await servicoManobrista.criarManobrista(dados);
+      buscarDados(true);
     } catch (e) {
-      console.error('Falha ao excluir motorista', e);
-      addToast('Erro ao excluir motorista', 'error');
+      console.error('Falha ao criar manobrista', e);
+      addToast('Erro ao criar manobrista', 'error');
+    }
+  };
+
+  const manipularExcluirManobrista = async (id: string) => {
+    try {
+      await servicoManobrista.deletarManobrista(id);
+      setManobristas(prev => prev.filter(s => s.id !== id));
+      addToast('Manobrista excluído com sucesso!', 'success');
+    } catch (e) {
+      console.error('Falha ao excluir manobrista', e);
+      addToast('Erro ao excluir manobrista', 'error');
     }
   };
 
@@ -339,14 +429,23 @@ const App: React.FC = () => {
         <AdminPanel
           routes={rotas}
           drivers={motoristas}
+          shunters={manobristas}
           expenses={despesas}
           veiculos={veiculos}
           solicitacoes={solicitacoes}
           onAddRoute={manipularAdicionarRota}
           onAddDriver={manipularAdicionarMotorista}
+          onAddShunter={manipularAdicionarManobrista}
           onDeleteDriver={manipularExcluirMotorista}
+          onDeleteShunter={manipularExcluirManobrista}
           onLogout={manipularLogout}
-          onRefresh={() => buscarDados(true)}
+          onRefresh={buscarDados}
+        />
+      )}
+      {visualizacaoAtual === 'shunter' && usuarioAtual?.tipo === TipoUsuario.MANOBRISTA && (
+        <ShunterPanel
+          shunter={usuarioAtual}
+          onLogout={manipularLogout}
         />
       )}
     </>

@@ -1,0 +1,7 @@
+ReferenceError: __awaiter is not defined
+    at evaluate (evaluate at Object.<anonymous> (C:\Users\adria\Desktop\ALC - SEARA\server\src\services\ravexScraper.ts:48:49), <anonymous>:0:11)
+    at ExecutionContext.#evaluate (C:\Users\adria\Desktop\ALC - SEARA\server\node_modules\puppeteer-core\src\cdp\ExecutionContext.ts:456:34)
+    at async ExecutionContext.evaluate (C:\Users\adria\Desktop\ALC - SEARA\server\node_modules\puppeteer-core\src\cdp\ExecutionContext.ts:293:12)
+    at async IsolatedWorld.evaluate (C:\Users\adria\Desktop\ALC - SEARA\server\node_modules\puppeteer-core\src\cdp\IsolatedWorld.ts:196:12)
+    at async CdpFrame.evaluate (C:\Users\adria\Desktop\ALC - SEARA\server\node_modules\puppeteer-core\src\api\Frame.ts:488:12)
+    at async CdpPage.evaluate (C:\Users\adria\Desktop\ALC - SEARA\server\node_modules\puppeteer-core\src\api\Page.ts:2362:12)

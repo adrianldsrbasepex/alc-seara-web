@@ -1,6 +1,7 @@
 export enum TipoUsuario {
   MOTORISTA = 'MOTORISTA',
-  ADMIN = 'ADMIN'
+  ADMIN = 'ADMIN',
+  MANOBRISTA = 'MANOBRISTA'
 }
 
 export enum StatusRota {
@@ -17,7 +18,13 @@ export enum TipoDespesa {
   ALIMENTACAO = 'Alimentação',
   MANUTENCAO = 'Manutenção',
   OUTROS = 'Outros',
-  PERNOITE_ADMIN = 'Pernoite (Admin)'
+  PERNOITE_ADMIN = 'Pernoite (Admin)',
+  DESCARGA = 'Descarga',
+  CHAPA = 'Chapa',
+  SALARIO = 'Salário',
+  AVARIA = 'Avaria de Mercadoria',
+  LAVAGEM = 'Lavagem',
+  MERCADORIA_PAGA = 'Mercadoria Paga'
 }
 
 export interface Usuario {
@@ -43,35 +50,50 @@ export interface Rota {
   origin: string;
   destination: string;
   date: string;
+  final_date?: string;
   status: StatusRota;
   cargo_type: string;
   estimated_revenue: number;
   initial_km: number;
   final_km?: number;
+  km_final_seara?: number;
   unloading_photo_url?: string;
   leftover_photo_url?: string; // Can contain multiple URLs separated by comma
   description?: string;
+  shunter_id?: string;
+  shunter_body_photo_url?: string;
+  shunter_boxes_photo_url?: string;
+  shunter_verified_at?: string;
+  reimbursement_sent?: boolean;
 }
 
 
 
 export interface Despesa {
   id: string;
-  rotaId: string;
-  motoristaId: string;
+  rotaId?: string;
+  motoristaId?: string;
+  vehicleId?: string;
   tipo: TipoDespesa;
   valor: number;
+  litros?: number; // Fuel quantity in liters
   date: string;
   observacoes?: string;
   img_url?: string;
+  ticket_log_id?: string;
+  reimbursement_sent?: boolean;
+  createdAt?: string;
 }
 
 export interface Veiculo {
   id: string;
   plate: string;
   model: string;
+  status: 'Em Rota' | 'Completa Carga' | 'Disponível' | 'Pernoite' | 'Manutenção';
   daily_rate: number;
   km_rate: number;
+  average_consumption?: number;
+  last_odometer?: number;
 }
 
 export interface VehicleDailyStatus {
@@ -110,6 +132,8 @@ export interface SolicitacaoPagamento {
   date: string;
   status: StatusSolicitacao;
   descricao: string;
+  metodoPagamento?: 'PIX' | 'OxPay' | 'Dinheiro' | 'Outro';
+  comprovanteUrl?: string;
 }
 
 export interface FinancialClosure {

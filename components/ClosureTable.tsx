@@ -18,6 +18,8 @@ export interface MergedClosureRow {
     // Dynamic values (getters or calculated on render)
     val_km_seara: number;
     val_km_perdido: number;
+    val_total_seara?: number;
+    val_total_alc?: number;
     val_total: number;
 
     status: 'Ok' | 'Sem Rota' | 'Sem Veículo';
@@ -27,26 +29,41 @@ interface ClosureTableProps {
     rows: MergedClosureRow[];
     onSave?: (data: MergedClosureRow[]) => void;
     readOnly?: boolean;
+    statusFilter?: string;
+    onStatusFilterChange?: (status: string) => void;
 }
 
-export const ClosureTable: React.FC<ClosureTableProps> = ({ rows, onSave, readOnly = false }) => {
+const safeNum = (val: any): number => {
+    if (val === null || val === undefined || val === '') return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    const n = parseFloat(String(val).replace(',', '.'));
+    return isNaN(n) ? 0 : n;
+};
+
+export const ClosureTable: React.FC<ClosureTableProps> = ({
+    rows,
+    onSave,
+    readOnly = false,
+    statusFilter = 'all',
+    onStatusFilterChange
+}) => {
     // ClosureTable now accepts rows directly
     // Logic for generating rows is moved to parent (AdminPanel)
 
     const handleKmSearaChange = (index: number, value: string) => {
         const floatVal = parseFloat(value) || 0;
-        // We need to update the specific row in the parent's state
-        // Create a copy of the row with the new value
         const updatedRow = { ...rows[index], km_seara: floatVal };
-
-        // Create a new array with the updated row
         const newRows = [...rows];
         newRows[index] = updatedRow;
+        onSave?.(newRows);
+    };
 
-        onSave(newRows); // Using onSave as a generic "onUpdate" for now or we should add a specific onRowUpdate prop. 
-        // To follow the plan, I will use onSave to propagate changes up, 
-        // but typically `onSave` implies a final action. 
-        // Let's assume onSave updates the parent state for now as "onRowsUpdate".
+    const handleDescargaChange = (index: number, value: string) => {
+        const floatVal = parseFloat(value) || 0;
+        const updatedRow = { ...rows[index], descarga: floatVal };
+        const newRows = [...rows];
+        newRows[index] = updatedRow;
+        onSave?.(newRows);
     };
 
     const handlePaymentDateChange = (value: string) => {
@@ -61,7 +78,6 @@ export const ClosureTable: React.FC<ClosureTableProps> = ({ rows, onSave, readOn
         onSave?.(newRows);
     };
 
-    const [statusFilter, setStatusFilter] = useState<string>('all');
 
     const filteredRows = rows.filter(row => {
         if (statusFilter === 'all') return true;
@@ -80,7 +96,7 @@ export const ClosureTable: React.FC<ClosureTableProps> = ({ rows, onSave, readOn
                     <h3 className="font-bold text-gray-900">Pré-visualização do Fechamento</h3>
                     <select
                         value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
+                        onChange={(e) => onStatusFilterChange?.(e.target.value)}
                         className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <option value="all">Todos os Status</option>
@@ -98,27 +114,30 @@ export const ClosureTable: React.FC<ClosureTableProps> = ({ rows, onSave, readOn
                             <th className="px-4 py-3">Tipo Veículo</th>
                             <th className="px-4 py-3">Identificador</th>
                             <th className="px-4 py-3">Placa</th>
+                            <th className="px-4 py-3 text-center">Consumo (KM/L)</th>
                             <th className="px-4 py-3 text-right">KM Real</th>
                             <th className="px-4 py-3 text-right text-blue-700 bg-blue-50">KM Seara (Edit)</th>
+                            <th className="px-4 py-3 text-right text-blue-700 bg-blue-50">Descarga (Edit)</th>
                             <th className="px-4 py-3 text-right">Valor KM (Seara)</th>
                             <th className="px-4 py-3 text-right">Valor KM (Perdido)</th>
-                            <th className="px-4 py-3 text-right">Descarga</th>
                             <th className="px-4 py-3 text-right">Valor Diária</th>
-                            <th className="px-4 py-3 text-right">Valor Total</th>
-                            <th className="px-4 py-3 text-blue-700 bg-blue-50">Data Pgto (Edit)</th>
+                            <th className="px-4 py-3 text-right text-gray-900 border-l border-gray-100 bg-gray-50/50">Valor total (Seara)</th>
+                            <th className="px-4 py-3 text-right font-bold text-gray-900 border-l border-gray-100 bg-gray-50/50">Valor Total (esperado ALC)</th>
+                            <th className="px-4 py-3 text-blue-700 bg-blue-50">Data Pagamento</th>
                             <th className="px-4 py-3">Status</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {filteredRows.map((row, index) => {
-                            const km_rate = row.vehicle?.km_rate || 0;
+                            const km_rate = safeNum(row.vehicle?.km_rate);
 
                             // Calculations
-                            const val_km_seara = row.km_seara * km_rate;
-                            const val_total_km_real = row.km_real * km_rate;
+                            const val_km_seara = safeNum(row.km_seara) * km_rate;
+                            const val_total_km_real = safeNum(row.km_real) * km_rate;
                             const val_km_perdido = Math.max(0, val_total_km_real - val_km_seara);
 
-                            const val_total = row.daily_rate + val_km_seara + row.descarga;
+                            const val_total_seara = (row.val_total_seara || 0) + safeNum(row.descarga);
+                            const val_total_alc = safeNum(row.daily_rate) + val_km_seara + safeNum(row.descarga);
 
                             return (
                                 <tr key={`${row.route_number}-${index}`} className="hover:bg-gray-50">
@@ -127,6 +146,11 @@ export const ClosureTable: React.FC<ClosureTableProps> = ({ rows, onSave, readOn
                                     <td className="px-4 py-3">
                                         <span className="font-medium bg-gray-100 px-2 py-1 rounded text-gray-700">
                                             {row.vehicle?.plate || '-'}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <span className={`text-xs font-bold ${row.vehicle?.average_consumption ? 'text-orange-600' : 'text-gray-300'}`}>
+                                            {row.vehicle?.average_consumption ? `${row.vehicle.average_consumption.toFixed(2)}` : '-'}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-right">{row.km_real.toLocaleString('pt-BR')} km</td>
@@ -147,20 +171,37 @@ export const ClosureTable: React.FC<ClosureTableProps> = ({ rows, onSave, readOn
                                             />
                                         )}
                                     </td>
+                                    <td className="px-4 py-3 text-right bg-blue-50/50">
+                                        {readOnly ? (
+                                            <span className="font-bold text-blue-700">R$ {row.descarga.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        ) : (
+                                            <input
+                                                type="number"
+                                                value={row.descarga}
+                                                onChange={(e) => {
+                                                    const originalIndex = rows.findIndex(r => r === row);
+                                                    if (originalIndex !== -1) {
+                                                        handleDescargaChange(originalIndex, e.target.value);
+                                                    }
+                                                }}
+                                                className="w-24 text-right px-2 py-1 border border-blue-200 rounded text-blue-700 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        )}
+                                    </td>
                                     <td className="px-4 py-3 text-right text-green-700">
-                                        R$ {val_km_seara.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        R$ {val_km_seara.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                     <td className="px-4 py-3 text-right text-red-500 font-medium">
-                                        R$ {val_km_perdido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        R$ {val_km_perdido.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                     <td className="px-4 py-3 text-right">
-                                        R$ {row.descarga.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        R$ {row.daily_rate.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
-                                    <td className="px-4 py-3 text-right">
-                                        R$ {row.daily_rate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    <td className="px-4 py-3 text-right text-gray-900 border-l border-gray-100 bg-gray-50/50">
+                                        R$ {val_total_seara.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                     <td className="px-4 py-3 text-right font-bold text-gray-900 border-l border-gray-100 bg-gray-50/50">
-                                        R$ {val_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        R$ {val_total_alc.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                     <td className="px-4 py-3 bg-blue-50/50">
                                         {readOnly ? (
@@ -194,15 +235,19 @@ export const ClosureTable: React.FC<ClosureTableProps> = ({ rows, onSave, readOn
             <div className="p-4 bg-gray-50 border-t border-gray-100">
                 <div className="flex gap-4 text-sm">
                     <div className="bg-white px-3 py-2 rounded border border-gray-200 shadow-sm">
-                        <span className="text-gray-500 mr-2">Total Descarga:</span>
+                        <span className="text-gray-500 mr-2">Total Seara:</span>
                         <span className="font-bold text-gray-900">
-                            R$ {rows.reduce((sum, r) => sum + r.descarga, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {rows.reduce((sum, r) => sum + safeNum(r.descarga), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                     </div>
                     <div className="bg-white px-3 py-2 rounded border border-gray-200 shadow-sm">
-                        <span className="text-gray-500 mr-2">Total Geral:</span>
+                        <span className="text-gray-500 mr-2">Total Esperado ALC:</span>
                         <span className="font-bold text-gray-900">
-                            R$ {rows.reduce((sum, r) => sum + (r.daily_rate + (r.km_seara * (r.vehicle?.km_rate || 0)) + r.descarga), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {rows.filter(r => statusFilter === 'all' || r.status === statusFilter).reduce((sum, r) => {
+                                const rate = safeNum(r.vehicle?.km_rate);
+                                const kmVal = safeNum(r.km_seara) * rate;
+                                return sum + (safeNum(r.daily_rate) + kmVal + safeNum(r.descarga));
+                            }, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                     </div>
                 </div>

@@ -41,6 +41,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
   const [routeToFinalize, setRouteToFinalize] = useState<Rota | null>(null);
   const [finalKm, setFinalKm] = useState('');
+  const [kmFinalSeara, setKmFinalSeara] = useState('');
   const [unloadingPhoto, setUnloadingPhoto] = useState<File | null>(null);
   const [unloadingPreview, setUnloadingPreview] = useState<string>('');
   const [isUploadingUnloading, setIsUploadingUnloading] = useState(false);
@@ -56,7 +57,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
 
   // New Route Form State
   const [newRouteCity, setNewRouteCity] = useState('');
-  const [newRouteDate, setNewRouteDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newRouteDate, setNewRouteDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }));
   const [newRouteKm, setNewRouteKm] = useState('');
 
   const [activeTab, setActiveTab] = useState<'routes' | 'expenses'>('routes');
@@ -102,7 +103,6 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
 
   const myRoutes = routes.filter(r => r.driver_id === driver.id);
   const activeRoutes = myRoutes.filter(r => r.status !== StatusRota.FINALIZADA);
-  const historyRoutes = myRoutes.filter(r => r.status === StatusRota.FINALIZADA);
   const myExpenses = expenses.filter(e => e.motoristaId === driver.id && e.tipo !== TipoDespesa.PERNOITE_ADMIN);
 
   const handleExpenseSubmit = async (e: React.FormEvent) => {
@@ -203,6 +203,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   const openFinalizeModal = (route: Rota) => {
     setRouteToFinalize(route);
     setFinalKm('');
+    setKmFinalSeara('');
     setIsFinalizeModalOpen(true);
   };
 
@@ -223,8 +224,8 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   };
 
   const handleFinalizeconfirm = async () => {
-    if (!routeToFinalize || !finalKm) {
-      addToast('Informe o KM final', 'warning');
+    if (!routeToFinalize || !finalKm || !kmFinalSeara) {
+      addToast('Informe os KMs finais', 'warning');
       return;
     }
 
@@ -258,7 +259,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   };
 
   const handleSobraNo = async () => {
-    if (!routeToFinalize || !finalKm) return;
+    if (!routeToFinalize || !finalKm || !kmFinalSeara) return;
 
     try {
       setIsUploadingUnloading(true);
@@ -281,14 +282,17 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
       onUpdateRoute(routeToFinalize.id, {
         status: StatusRota.FINALIZADA,
         final_km: kmFinal,
+        km_final_seara: parseFloat(kmFinalSeara),
         estimated_revenue: revenue,
-        unloading_photo_url: unloadingUrl
+        unloading_photo_url: unloadingUrl,
+        final_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
       });
 
       addToast('Rota finalizada com sucesso!', 'success');
       setIsSobraConfirmOpen(false);
       setRouteToFinalize(null);
       setFinalKm('');
+      setKmFinalSeara('');
       setUnloadingPhoto(null);
       setUnloadingPreview('');
       setViewMode('identification');
@@ -303,7 +307,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   };
 
   const handleSobraSaveAndFinalize = async () => {
-    if (!routeToFinalize || !finalKm || sobraPhotos.length === 0) return;
+    if (!routeToFinalize || !finalKm || !kmFinalSeara || sobraPhotos.length === 0) return;
 
     try {
       setIsUploadingUnloading(true);
@@ -333,6 +337,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
       onUpdateRoute(routeToFinalize.id, {
         status: StatusRota.FINALIZADA,
         final_km: kmFinal,
+        km_final_seara: parseFloat(kmFinalSeara),
         estimated_revenue: revenue,
         unloading_photo_url: unloadingUrl,
         leftover_photo_url: joinedSobraUrls
@@ -342,6 +347,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
       setIsSobraModalOpen(false);
       setRouteToFinalize(null);
       setFinalKm('');
+      setKmFinalSeara('');
       setUnloadingPhoto(null);
       setUnloadingPreview('');
       setSobraPhotos([]);
@@ -716,90 +722,6 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
               </div>
             </div>
 
-            {/* History Section */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <History className="w-5 h-5 text-gray-400" />
-                <h3 className="text-lg font-bold text-gray-900 tracking-tight">Histórico de Viagens</h3>
-              </div>
-
-              <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm">
-                {historyRoutes.length === 0 ? (
-                  <p className="text-gray-400 text-sm font-medium italic">Nenhuma viagem finalizada recentemente.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {historyRoutes.map(route => (
-                      <div key={route.id} className="bg-gray-50 rounded-xl border border-gray-100 p-4 transition-all hover:bg-white hover:shadow-md text-left">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-green-100 text-green-700 border border-green-200 uppercase tracking-wider">
-                            {route.status}
-                          </span>
-                          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                            {new Date(route.date).toLocaleDateString('pt-BR')}
-                          </span>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-900 font-black">
-                          <span>{route.origin}</span>
-                          <span className="mx-2 text-gray-300">➔</span>
-                          <span>{route.destination}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Expenses History */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Receipt className="w-5 h-5 text-gray-400" />
-                <h3 className="text-lg font-bold text-gray-900 tracking-tight">Histórico de Despesas</h3>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                {myExpenses.length === 0 ? (
-                  <div className="p-10 text-center flex flex-col items-center">
-                    <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4 border border-gray-100 shadow-sm">
-                      <PlusCircle className="w-8 h-8 text-gray-200" />
-                    </div>
-                    <p className="text-gray-400 text-sm font-medium">Nenhuma despesa registrada nesta viagem.</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-50">
-                    {myExpenses.map(exp => (
-                      <div key={exp.id} className="p-5 hover:bg-gray-50 transition-colors">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1">
-                            <p className="font-black text-gray-900 text-sm uppercase tracking-tight">{exp.tipo}</p>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">
-                              {new Date(exp.date).toLocaleDateString('pt-BR')} • {exp.observacoes || 'Sem observações'}
-                            </p>
-                          </div>
-                          <span className="font-black text-gray-900 ml-4">
-                            R$ {exp.valor.toFixed(2)}
-                          </span>
-                        </div>
-                        {exp.img_url && (
-                          <button
-                            onClick={() => window.open(exp.img_url, '_blank')}
-                            className="mt-2 text-[10px] font-black text-[#D32F2F] uppercase tracking-widest flex items-center gap-1.5 border border-red-100 bg-red-50/50 px-2 py-1 rounded-md"
-                          >
-                            <Camera className="w-3 h-3" /> Ver Comprovante
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <div className="p-5 bg-[#F8FAFC] flex justify-between items-center border-t border-gray-100">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Acumulado</span>
-                      <span className="font-black text-[#D32F2F] text-xl">
-                        R$ {myExpenses.reduce((acc, curr) => acc + curr.valor, 0).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         )}
 
@@ -937,35 +859,6 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
               </form>
             </div>
 
-            {/* Expenses History */}
-            <div>
-              <h3 className="text-lg font-bold text-gray-800 mb-3">Histórico de Gastos</h3>
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                {myExpenses.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500">Nenhum gasto registrado.</div>
-                ) : (
-                  <div className="divide-y divide-gray-100">
-                    {myExpenses.map(exp => (
-                      <div key={exp.id} className="p-4 flex justify-between items-center">
-                        <div>
-                          <p className="font-medium text-gray-900">{exp.tipo}</p>
-                          <p className="text-xs text-gray-500">{new Date(exp.date).toLocaleDateString('pt-BR')} • {exp.observacoes || 'Sem observações'}</p>
-                        </div>
-                        <span className="font-bold text-gray-900">
-                          R$ {exp.valor.toFixed(2)}
-                        </span>
-                      </div>
-                    ))}
-                    <div className="p-4 bg-gray-50 flex justify-between items-center">
-                      <span className="font-semibold text-gray-700">Total</span>
-                      <span className="font-bold text-brand-700 text-lg">
-                        R$ {myExpenses.reduce((acc, curr) => acc + curr.valor, 0).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         )}
       </main>
@@ -1241,16 +1134,29 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
               </div>
             </div>
             <div className="p-8 space-y-6">
-              <div>
-                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">KM Final</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={finalKm}
-                  onChange={(e) => setFinalKm(e.target.value)}
-                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500/30 outline-none font-bold text-gray-900 transition-all font-mono"
-                  placeholder="0.00"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">KM Final</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={finalKm}
+                    onChange={(e) => setFinalKm(e.target.value)}
+                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500/30 outline-none font-bold text-gray-900 transition-all font-mono"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 animate-flash-orange-text">KM Final Seara</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={kmFinalSeara}
+                    onChange={(e) => setKmFinalSeara(e.target.value)}
+                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500/30 outline-none font-bold text-gray-900 transition-all font-mono animate-flash-orange-box"
+                    placeholder="0.00"
+                  />
+                </div>
               </div>
 
               {/* Unloading Photo Upload */}
@@ -1312,6 +1218,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                 onClick={() => {
                   setIsFinalizeModalOpen(false);
                   setFinalKm('');
+                  setKmFinalSeara('');
                   setUnloadingPhoto(null);
                   setUnloadingPreview('');
                 }}

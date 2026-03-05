@@ -13,3 +13,28 @@
 .animate-slide-in-right {
     animation: slideInRight 0.3s ease-out forwards;
 }
+
+@keyframes flashOrangeText {
+    0%, 100% { color: #9ca3af; }
+    50% { color: #f97316; font-weight: 900; }
+}
+
+@keyframes flashOrangeBox {
+    0%, 100% { 
+        border-color: #f3f4f6;
+        background-color: #f9fafb;
+    }
+    50% { 
+        border-color: #f97316;
+        background-color: #fff7ed;
+        box-shadow: 0 0 15px rgba(249, 115, 22, 0.2);
+    }
+}
+
+.animate-flash-orange-text {
+    animation: flashOrangeText 1.5s infinite;
+}
+
+.animate-flash-orange-box {
+    animation: flashOrangeBox 1.5s infinite;
+}

@@ -18,19 +18,23 @@ export const leftoverCargoService = {
         photoUrl: string;
         notes?: string;
     }) {
+        const payload = {
+            route_id: data.routeId,
+            driver_id: data.driverId,
+            box_number: data.boxNumber,
+            photo_url: data.photoUrl,
+            notes: data.notes
+        };
+
         const { data: result, error } = await supabase
             .from('leftover_cargo')
-            .insert([{
-                route_id: data.routeId,
-                driver_id: data.driverId,
-                box_number: data.boxNumber,
-                photo_url: data.photoUrl,
-                notes: data.notes || null
-            }])
+            .insert(payload)
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) throw new Error(error.message);
+
+
         return result as LeftoverCargo;
     },
 
@@ -46,7 +50,7 @@ export const leftoverCargoService = {
             driver_id: item.driverId,
             box_number: item.boxNumber,
             photo_url: item.photoUrl,
-            notes: item.notes || null
+            notes: item.notes
         }));
 
         const { data, error } = await supabase
@@ -54,7 +58,9 @@ export const leftoverCargoService = {
             .insert(records)
             .select();
 
-        if (error) throw error;
+        if (error) throw new Error(error.message);
+
+
         return data as LeftoverCargo[];
     },
 
@@ -62,10 +68,9 @@ export const leftoverCargoService = {
         const { data, error } = await supabase
             .from('leftover_cargo')
             .select('*')
-            .eq('route_id', routeId)
-            .order('box_number', { ascending: true });
+            .eq('route_id', routeId);
 
-        if (error) throw error;
+        if (error) throw new Error(error.message);
         return data as LeftoverCargo[];
     }
 };

@@ -5,13 +5,11 @@ export const servicoMotorista = {
     async obterMotoristas() {
         const { data, error } = await supabase
             .from('drivers')
-            .select('*')
-            .order('name');
+            .select('*');
 
-        if (error) throw error;
+        if (error) throw new Error(error.message);
 
-        // Map snake_case from DB to camelCase for app
-        return (data || []).map(driver => ({
+        return (data || []).map((driver: any) => ({
             id: driver.id,
             nome: driver.name,
             email: driver.email,
@@ -24,25 +22,24 @@ export const servicoMotorista = {
     },
 
     async criarMotorista(motorista: Omit<Motorista, 'id'>) {
-        // Map camelCase to snake_case for Supabase
-        const motoristaDb = {
+        const payload = {
             name: motorista.nome,
             email: motorista.email,
             phone: motorista.telefone,
-            license_plate: motorista.placa || null,
-            vehicle_model: motorista.modeloVeiculo || null,
-            avatar_url: motorista.avatarUrl || null
+            license_plate: motorista.placa,
+            vehicle_model: motorista.modeloVeiculo,
+            avatar_url: motorista.avatarUrl
         };
 
         const { data, error } = await supabase
             .from('drivers')
-            .insert([motoristaDb])
+            .insert(payload)
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) throw new Error(error.message);
 
-        // Map snake_case back to camelCase for app
+
         return {
             id: data.id,
             nome: data.name,
@@ -56,15 +53,34 @@ export const servicoMotorista = {
     },
 
     async atualizarMotorista(id: string, atualizacoes: Partial<Motorista>) {
+        const payload: any = {};
+        if (atualizacoes.nome !== undefined) payload.name = atualizacoes.nome;
+        if (atualizacoes.email !== undefined) payload.email = atualizacoes.email;
+        if (atualizacoes.telefone !== undefined) payload.phone = atualizacoes.telefone;
+        if (atualizacoes.placa !== undefined) payload.license_plate = atualizacoes.placa;
+        if (atualizacoes.modeloVeiculo !== undefined) payload.vehicle_model = atualizacoes.modeloVeiculo;
+        if (atualizacoes.avatarUrl !== undefined) payload.avatar_url = atualizacoes.avatarUrl;
+
         const { data, error } = await supabase
             .from('drivers')
-            .update(atualizacoes)
+            .update(payload)
             .eq('id', id)
             .select()
             .single();
 
-        if (error) throw error;
-        return data as Motorista;
+        if (error) throw new Error(error.message);
+
+
+        return {
+            id: data.id,
+            nome: data.name,
+            email: data.email,
+            telefone: data.phone,
+            placa: data.license_plate || '',
+            modeloVeiculo: data.vehicle_model || '',
+            avatarUrl: data.avatar_url,
+            tipo: 'MOTORISTA'
+        } as Motorista;
     },
 
     async excluirMotorista(id: string) {
@@ -73,7 +89,9 @@ export const servicoMotorista = {
             .delete()
             .eq('id', id);
 
-        if (error) throw error;
+        if (error) throw new Error(error.message);
+
+
         return { sucesso: true };
     }
 };
